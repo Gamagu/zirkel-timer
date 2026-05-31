@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Zirkel Timer</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Einstellungs-Bildschirm -->
+  <div id="setup-screen" class="screen">
+    <h1>Zirkel Timer</h1>
+    <form id="settings-form">
+      <div class="form-group">
+        <label for="warmup">Warmup (Sekunden)</label>
+        <input type="number" id="warmup" min="0" max="600" value="60">
+      </div>
+      <div class="form-group">
+        <label for="rounds">Anzahl Runden</label>
+        <input type="number" id="rounds" min="1" max="50" value="3">
+      </div>
+      <div class="form-group">
+        <label for="intervals">Intervalle pro Runde</label>
+        <input type="number" id="intervals" min="1" max="50" value="5">
+      </div>
+      <div class="form-group">
+        <label for="interval-time">Intervall-Zeit (Sekunden)</label>
+        <input type="number" id="interval-time" min="5" max="600" value="30">
+      </div>
+      <div class="form-group">
+        <label for="pause-time">Pause zwischen Intervallen (Sekunden)</label>
+        <input type="number" id="pause-time" min="0" max="300" value="10">
+      </div>
+      <div class="form-group">
+        <label for="round-pause-time">Pause zwischen Runden (Sekunden)</label>
+        <input type="number" id="round-pause-time" min="0" max="600" value="60">
+      </div>
+      <div class="form-group">
+        <label for="countdown">Ankündigung letzte Sekunden</label>
+        <input type="number" id="countdown" min="0" max="10" value="3">
+      </div>
+      <button type="submit" class="btn btn-start">START</button>
+    </form>
+    <p class="hint">Einstellungen werden in der URL gespeichert - einfach URL bookmarken!</p>
+  </div>
+
+  <!-- Timer-Bildschirm -->
+  <div id="timer-screen" class="screen hidden">
+    <div id="status-display">
+      <div id="phase-label">Warmup</div>
+      <div id="timer-display">00:00</div>
+      <div id="progress-info">
+        <span id="round-info">Runde 1/3</span>
+        <span id="interval-info">Intervall 1/5</span>
+      </div>
+    </div>
+    <div id="total-time">Gesamt: <span id="total-elapsed">00:00</span></div>
+    <div class="timer-controls">
+      <button id="btn-pause" class="btn btn-pause">PAUSE</button>
+      <button id="btn-stop" class="btn btn-stop">STOP</button>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
