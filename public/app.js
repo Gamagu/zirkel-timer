@@ -36,6 +36,7 @@
   let currentPhaseIndex = 0;
   let currentPhaseRemaining = 0;
   let audioCtx = null;
+  let compressor = null;
 
   // ============================================================
   // Audio - Web Audio API
@@ -52,6 +53,15 @@
       } catch (e) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
+
+      // DynamicsCompressor allows high gain without clipping
+      compressor = audioCtx.createDynamicsCompressor();
+      compressor.threshold.setValueAtTime(-6, audioCtx.currentTime);
+      compressor.knee.setValueAtTime(3, audioCtx.currentTime);
+      compressor.ratio.setValueAtTime(4, audioCtx.currentTime);
+      compressor.attack.setValueAtTime(0.003, audioCtx.currentTime);
+      compressor.release.setValueAtTime(0.1, audioCtx.currentTime);
+      compressor.connect(audioCtx.destination);
 
       // Use a silent buffer trick to keep audio session "ambient" on iOS:
       // Play a short silent buffer immediately to establish the session
@@ -78,45 +88,46 @@
     oscillator.type = type;
     oscillator.frequency.setValueAtTime(frequency, ctx.currentTime);
 
-    gainNode.gain.setValueAtTime(volume, ctx.currentTime);
+    // Multiply volume by 4 - compressor prevents clipping
+    gainNode.gain.setValueAtTime(volume * 4, ctx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + duration);
 
     oscillator.connect(gainNode);
-    gainNode.connect(ctx.destination);
+    gainNode.connect(compressor);
 
     oscillator.start(ctx.currentTime);
     oscillator.stop(ctx.currentTime + duration);
   }
 
   function playCountdownBeep() {
-    playTone(800, 0.1, 'sine', 0.6);
+    playTone(800, 0.1, 'sine', 1.0);
   }
 
   function playCountdownFinal() {
-    playTone(1200, 0.4, 'sine', 0.8);
+    playTone(1200, 0.4, 'sine', 1.0);
   }
 
   function playExerciseStart() {
     // Hoher langer Ton
-    playTone(880, 0.5, 'sine', 0.7);
+    playTone(880, 0.5, 'sine', 1.0);
   }
 
   function playPauseStart() {
     // Tiefer kurzer Ton
-    playTone(400, 0.3, 'triangle', 0.5);
+    playTone(400, 0.3, 'triangle', 1.0);
   }
 
   function playRoundPauseStart() {
     // Doppelter Ton
-    playTone(600, 0.2, 'sine', 0.6);
-    setTimeout(() => playTone(600, 0.2, 'sine', 0.6), 300);
+    playTone(600, 0.2, 'sine', 1.0);
+    setTimeout(() => playTone(600, 0.2, 'sine', 1.0), 300);
   }
 
   function playWorkoutDone() {
     // Dreifacher aufsteigender Ton
-    playTone(523, 0.3, 'sine', 0.7);
-    setTimeout(() => playTone(659, 0.3, 'sine', 0.7), 350);
-    setTimeout(() => playTone(784, 0.5, 'sine', 0.8), 700);
+    playTone(523, 0.3, 'sine', 1.0);
+    setTimeout(() => playTone(659, 0.3, 'sine', 1.0), 350);
+    setTimeout(() => playTone(784, 0.5, 'sine', 1.0), 700);
   }
 
   // ============================================================
