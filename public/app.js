@@ -29,7 +29,9 @@
   };
 
   // --- State ---
-  let timerInterval = null;
+  let timerTimeout = null;
+  let timerRunning = false;
+  let lastTickTime = 0;
   let isPaused = false;
   let totalSeconds = 0;
   let phases = [];
@@ -42,7 +44,7 @@
   // Audio - Web Audio API
   // ============================================================
 
-  function getAudioContext() {
+  async function getAudioContext() {
     if (!audioCtx) {
       try {
         // Safari/WebKit: 'ambient' mixes with background music
@@ -74,14 +76,15 @@
         source.start(0);
       }
     }
+    // Await the resume so the context is fully active before we play anything
     if (audioCtx.state === 'suspended') {
-      audioCtx.resume();
+      await audioCtx.resume();
     }
     return audioCtx;
   }
 
-  function playTone(frequency, duration, type = 'sine', volume = 1) {
-    const ctx = getAudioContext();
+  async function playTone(frequency, duration, type = 'sine', volume = 1) {
+    const ctx = await getAudioContext();
     const oscillator = ctx.createOscillator();
     const gainNode = ctx.createGain();
 
@@ -292,21 +295,29 @@
     updateDisplay();
   }
 
-  function tick() {
-    if (isPaused) return;
+  // Advance state by 1 second without sounds — used to catch up after device sleep.
+  function advanceSilently() {
+    currentPhaseRemaining--;
+    totalSeconds++;
 
-    const phase = phases[currentPhaseIndex];
+    if (currentPhaseRemaining < 0) {
+      currentPhaseIndex++;
+      if (currentPhaseIndex >= phases.length) {
+        timerRunning = false;
+        finishWorkout();
+        return;
+      }
+      currentPhaseRemaining = phases[currentPhaseIndex].duration;
+    }
+  }
+
+  function tick() {
     const countdownSecs = parseInt(fields.countdown.value) || 3;
 
     // Akustischer Countdown in den letzten Sekunden jeder Phase
     // (signalisiert, dass gleich etwas Neues kommt)
     if (currentPhaseRemaining > 0 && currentPhaseRemaining <= countdownSecs) {
-      if (currentPhaseRemaining === 1) {
-        playCountdownBeep();
-        //playCountdownFinal();
-      } else {
-        playCountdownBeep();
-      }
+      playCountdownBeep();
     }
 
     currentPhaseRemaining--;
@@ -320,9 +331,42 @@
     }
   }
 
+  // Schedule the next tick, correcting for how long the current tick actually took.
+  // This prevents drift: if a tick fires 50 ms late, the next one fires 50 ms early.
+  function scheduleNextTick() {
+    if (!timerRunning || isPaused) return;
+    const elapsed = Date.now() - lastTickTime;
+    const delay = Math.max(0, 1000 - elapsed);
+    timerTimeout = setTimeout(runTick, delay);
+  }
+
+  function runTick() {
+    if (!timerRunning || isPaused) return;
+
+    const now = Date.now();
+    const elapsed = now - lastTickTime;
+    // How many whole seconds passed (normally 1; more if the device was asleep)
+    const ticks = Math.max(1, Math.round(elapsed / 1000));
+    lastTickTime = now;
+
+    // Silently advance state for any missed seconds so the display jumps to
+    // the correct position without replaying stale sounds.
+    for (let i = 0; i < ticks - 1 && timerRunning; i++) {
+      advanceSilently();
+    }
+
+    // Play the current second normally (with sounds)
+    if (timerRunning) {
+      tick();
+    }
+
+    scheduleNextTick();
+  }
+
   function finishWorkout() {
-    clearInterval(timerInterval);
-    timerInterval = null;
+    timerRunning = false;
+    clearTimeout(timerTimeout);
+    timerTimeout = null;
 
     playWorkoutDone();
 
@@ -361,13 +405,16 @@
     // Start first phase
     startPhase(0);
 
-    // Start the tick interval
-    timerInterval = setInterval(tick, 1000);
+    // Start the tick loop
+    timerRunning = true;
+    lastTickTime = Date.now();
+    scheduleNextTick();
   }
 
   function stopTimer() {
-    clearInterval(timerInterval);
-    timerInterval = null;
+    timerRunning = false;
+    clearTimeout(timerTimeout);
+    timerTimeout = null;
     isPaused = false;
 
     // Switch back to setup
@@ -379,15 +426,20 @@
   }
 
   function togglePause() {
-    if (!timerInterval) return; // Already finished
+    if (!timerRunning) return; // Already finished
 
     isPaused = !isPaused;
     btnPause.textContent = isPaused ? 'WEITER' : 'PAUSE';
 
     if (isPaused) {
       btnPause.classList.add('paused');
+      clearTimeout(timerTimeout);
+      timerTimeout = null;
     } else {
       btnPause.classList.remove('paused');
+      // Reset lastTickTime so we don't count the paused duration as elapsed
+      lastTickTime = Date.now();
+      scheduleNextTick();
     }
   }
 
@@ -415,9 +467,6 @@
     }
   }
 
-  // Request wake lock when timer starts
-  const originalStartTimer = startTimer;
-
   // Load settings from URL on page load
   loadSettingsFromURL();
 
@@ -425,9 +474,6 @@
   settingsForm.addEventListener('submit', () => {
     requestWakeLock();
   });
-
-  // Release wake lock on stop
-  const originalStopTimer = stopTimer;
 
   document.getElementById('btn-stop').addEventListener('click', () => {
     if (wakeLock) {
