@@ -482,4 +482,21 @@
     }
   });
 
+  // iOS suspends the AudioContext whenever you switch to another app.
+  // resume() only works from inside a user-gesture handler (touchstart qualifies).
+  // We hook every possible re-entry point so the first tap after returning
+  // to Safari unblocks audio before the next beep fires.
+  function tryResumeAudio() {
+    if (audioCtx && audioCtx.state === 'suspended') {
+      audioCtx.resume();
+    }
+  }
+
+  document.addEventListener('touchstart', tryResumeAudio, { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') tryResumeAudio();
+  });
+  window.addEventListener('focus', tryResumeAudio);
+  window.addEventListener('pageshow', tryResumeAudio);
+
 })();
